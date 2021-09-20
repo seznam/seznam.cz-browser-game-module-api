@@ -6,7 +6,9 @@
   "module": "dist/index.js",
   "type": "module",
   "scripts": {
-    "test": "npx eslint --ext .ts ."
+    "compile": "tsc --project .",
+    "test": "eslint --ext .ts .",
+    "prepublishOnly": "rm -rf dist/ && npm test && npm run compile"
   },
   "repository": {
     "type": "git",
@@ -34,5 +36,9 @@
     "@typescript-eslint/parser": "^4.31.1",
     "eslint": "^7.32.0",
     "typescript": "^4.4.3"
+  },
+  "engines": {
+    "node": ">=16",
+    "npm": ">=7"
   }
 }
