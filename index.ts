@@ -21,6 +21,9 @@ interface ApiBinding<MethodBinding extends AndroidApiMethodBinding | IOSApiMetho
     gamesExit?: MethodBinding | unknown
     openLoginForm?: MethodBinding | unknown
     isSignedIn?: MethodBinding | unknown
+    storage_get?: MethodBinding | unknown
+    storage_set?: MethodBinding | unknown
+    storage_delete?: MethodBinding | unknown
 }
 
 interface AndroidApiMethodBinding {
@@ -128,6 +131,87 @@ export function isSignedIn(): Promise<boolean> {
             reject(new Error('No supported native SBrowser API is available'))
         }
     })
+}
+
+export interface Storage {
+    get(key: string): Promise<unknown | null>
+    set(key: string, value: unknown): Promise<void>
+    delete(key: string): Promise<void>
+}
+
+export function getStorage(): Storage | null {
+    const methods = ['get', 'set', 'delete'] as const
+    if (
+        methods.some(methodName => typeof sbrowserAndroidApiBindings[`storage_${methodName}`] !== 'function') &&
+        methods.some(methodName =>
+            !sbrowserIOSApiBindings[`storage_${methodName}`] ||
+            typeof (sbrowserIOSApiBindings[`storage_${methodName}`] as IOSApiMethodBinding).postMessage !== 'function'
+        )
+    ) {
+        return null
+    }
+
+    return {
+        get(key: string): Promise<unknown> {
+            return new Promise((resolve, reject) => {
+                const {callbackID, callback} = createCallback(resolve, reject)
+                callNativeVoidReturningMethod('storage_get', [key, callback], JSON.stringify({key, callbackID}))
+            })
+        },
+        set(key: string, value: unknown): Promise<void> {
+            return new Promise((resolve, reject) => {
+                const {callbackID, callback} = createCallback(() => resolve(), reject)
+                callNativeVoidReturningMethod(
+                    'storage_set',
+                    [key, JSON.stringify(value), callback],
+                    JSON.stringify({key, value: JSON.stringify(value), callbackID}),
+                )
+            })
+        },
+        delete(key: string): Promise<void> {
+            return new Promise((resolve, reject) => {
+                const {callbackID, callback} = createCallback(() => resolve(), reject)
+                callNativeVoidReturningMethod('storage_delete', [key, callback], JSON.stringify({key, callbackID}))
+            })
+        },
+    }
+
+    function createCallback(
+        resolve: (value: unknown) => void,
+        reject: (error: Error) => void,
+    ): {callbackID: string, callback: (error: Error | undefined, value: unknown) => void} {
+        const callbackID = createGlobalCallback((error, value) => {
+            if (error) {
+                reject(error)
+            } else if (value === null || value === undefined) {
+                resolve(value)
+            } else {
+                resolve(JSON.parse(value as string))
+            }
+        })
+        const callback = (
+            window.sbrowser as {[id: string]: (error: Error | undefined, value: unknown) => void}
+        )[callbackID]
+        return {callbackID, callback}
+    }
+
+    function createGlobalCallback(callback: (error: Error | undefined, value: unknown) => void): string {
+        window.sbrowser = window.sbrowser || {}
+        const callbackIdPrefix = `${Date.now()}` + Math.floor(Math.random() * 8_192)
+        let idCounter = 0
+        while (`callback_${callbackIdPrefix}_${idCounter}` in window.sbrowser) {
+            idCounter++
+        }
+        const callbackId = `callback_${callbackIdPrefix}_${idCounter}`
+        ;(window.sbrowser as {[id: string]: (error: Error | undefined, value: unknown) => void})[callbackId] = (
+            error: Error | undefined,
+            value: unknown,
+        ): void => {
+            delete (window.sbrowser as {[id: string]: unknown})[callbackId]
+            callback(error, value)
+        }
+        return callbackId
+    }
 }
 
 function callNativeVoidReturningMethod(
