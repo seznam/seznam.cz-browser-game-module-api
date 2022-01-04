@@ -153,27 +153,31 @@ export function getStorage(): Storage | null {
 
     return {
         get(key: string): Promise<unknown> {
-            return new Promise((resolve, reject) => {
-                const {callbackID, callback} = createCallback(resolve, reject)
-                callNativeVoidReturningMethod('storage_get', [key, callback], JSON.stringify({key, callbackID}))
-            })
+            return executeOperation('storage_get', key)
         },
         set(key: string, value: unknown): Promise<void> {
-            return new Promise((resolve, reject) => {
-                const {callbackID, callback} = createCallback(() => resolve(), reject)
-                callNativeVoidReturningMethod(
-                    'storage_set',
-                    [key, JSON.stringify(value), callback],
-                    JSON.stringify({key, value: JSON.stringify(value), callbackID}),
-                )
-            })
+            return executeOperation('storage_set', key, value) as Promise<void>
         },
         delete(key: string): Promise<void> {
-            return new Promise((resolve, reject) => {
-                const {callbackID, callback} = createCallback(() => resolve(), reject)
-                callNativeVoidReturningMethod('storage_delete', [key, callback], JSON.stringify({key, callbackID}))
-            })
+            return executeOperation('storage_delete', key) as Promise<void>
         },
+    }
+
+    function executeOperation(methodName: ApiMethodName, key: string, value: unknown = undefined): Promise<unknown> {
+        return new Promise((resolve, reject) => {
+            const {callbackID} = createCallback(resolve, reject)
+            const serializedValue = value === undefined ? value : JSON.stringify(value)
+            const androidArgs = value === undefined ? [key] : [key, serializedValue]
+            const iOSArg = JSON.stringify(value === undefined ? {key, callbackID} : {key, serializedValue, callbackID})
+            const result = callNativeMethod(methodName, androidArgs, iOSArg)
+            if (result.usedImplementation === 'Android') {
+                if (result.thrownError) {
+                    reject(result.thrownError)
+                } else {
+                    resolve(result.returnedValue)
+                }
+            }
+        })
     }
 
     function createCallback(
@@ -219,12 +223,30 @@ function callNativeVoidReturningMethod(
     androidArguments: readonly unknown[] = [],
     iosArgument = '',
 ): boolean {
+    const callResult = callNativeMethod(methodName, androidArguments, iosArgument)
+    return callResult.usedImplementation !== null && callResult.thrownError === null
+}
+
+function callNativeMethod(
+    methodName: ApiMethodName,
+    androidArguments: readonly unknown[] = [],
+    iosArgument = '',
+): {usedImplementation: 'Android' | 'iOS' | null, returnedValue: unknown, thrownError: Error | null} {
     if (typeof sbrowserAndroidApiBindings[methodName] === 'function') {
         try {
-            (sbrowserAndroidApiBindings[methodName] as AndroidApiMethodBinding)(...androidArguments)
-            return true
+            const returnedValue = (sbrowserAndroidApiBindings[methodName] as AndroidApiMethodBinding)(...androidArguments)
+            return {
+                usedImplementation: 'Android',
+                returnedValue,
+                thrownError: null,
+            }
         } catch (sbrowserApiError) {
             console.error(`SBrowser API.${methodName}: Failed to execute the ${methodName} method`, sbrowserApiError)
+            return {
+                usedImplementation: 'Android',
+                returnedValue: undefined,
+                thrownError: sbrowserApiError instanceof Error ? sbrowserApiError : new Error(`${sbrowserApiError}`),
+            }
         }
     }
 
@@ -238,12 +260,25 @@ function callNativeVoidReturningMethod(
 
     if (iosMethodBinding && typeof iosMethodBinding.postMessage === 'function') {
         try {
-            iosMethodBinding.postMessage(iosArgument)
-            return true
+            const returnedValue = iosMethodBinding.postMessage(iosArgument)
+            return {
+                usedImplementation: 'iOS',
+                returnedValue,
+                thrownError: null,
+            }
         } catch (sbrowserApiError) {
             console.error(`SBrowser API.${methodName}: Failed to execute the ${methodName} method`, sbrowserApiError)
+            return {
+                usedImplementation: 'iOS',
+                returnedValue: undefined,
+                thrownError: sbrowserApiError instanceof Error ? sbrowserApiError : new Error(`${sbrowserApiError}`),
+            }
         }
     }
 
-    return false
+    return {
+        usedImplementation: null,
+        returnedValue: undefined,
+        thrownError: null,
+    }
 }
