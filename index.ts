@@ -174,7 +174,8 @@ export function getStorage(): Storage | null {
                 if (result.thrownError) {
                     reject(result.thrownError)
                 } else {
-                    resolve(result.returnedValue)
+                    const {returnedValue} = result
+                    resolve(typeof returnedValue === 'string' ? JSON.parse(returnedValue) : null)
                 }
             }
         })
