@@ -188,7 +188,7 @@ export function getStorage(): Storage | null {
             if (error) {
                 reject(error)
             } else if (value === null || value === undefined) {
-                resolve(value)
+                resolve(null)
             } else {
                 resolve(JSON.parse(value as string))
             }
