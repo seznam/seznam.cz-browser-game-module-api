@@ -171,6 +171,7 @@ export function getStorage(): Storage | null {
             const iOSArg = JSON.stringify(value === undefined ? {key, callbackID} : {key, serializedValue, callbackID})
             const result = callNativeMethod(methodName, androidArgs, iOSArg)
             if (result.usedImplementation === 'Android') {
+                delete (window.sbrowser as {[id: string]: unknown})[callbackID]
                 if (result.thrownError) {
                     reject(result.thrownError)
                 } else {
