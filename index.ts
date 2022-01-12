@@ -1,10 +1,10 @@
 declare global {
     interface Window {
-        sbrowser?: AndroidApiBinding
+        sbrowser_games?: AndroidApiBinding
         webkit?: {messageHandlers?: IOSApiBinding | unknown} | unknown
     }
 
-    let sbrowser: unknown
+    let sbrowser_games: unknown
     let webkit: unknown
 }
 
@@ -34,7 +34,9 @@ interface IOSApiMethodBinding {
     postMessage?: ((serializedData: string) => void) | unknown
 }
 
-const sbrowserAndroidApiBindings: AndroidApiBinding = typeof sbrowser === 'object' && sbrowser ? sbrowser : {}
+const sbrowserAndroidApiBindings: AndroidApiBinding = (
+    typeof sbrowser_games === 'object' && sbrowser_games ? sbrowser_games : {}
+)
 const sbrowserIOSApiBindings: IOSApiBinding = (() => {
     if (typeof webkit !== 'object' || !webkit || !('messageHandlers' in webkit)) {
         return {}
@@ -113,11 +115,11 @@ export function isSignedIn(): Promise<boolean> {
             }
         } else if (iosIsSignedIn && typeof iosIsSignedIn.postMessage === 'function') {
             try {
-                window.sbrowser = window.sbrowser || {}
-                window.sbrowser.isSignedIn = (isUserSignedIn: boolean) => {
+                window.sbrowser_games = window.sbrowser_games || {}
+                window.sbrowser_games.isSignedIn = (isUserSignedIn: boolean) => {
                     resolve(!!isUserSignedIn)
-                    if (window.sbrowser && window.sbrowser.isSignedIn) {
-                        delete window.sbrowser.isSignedIn
+                    if (window.sbrowser_games && typeof window.sbrowser_games.isSignedIn === 'function') {
+                        delete window.sbrowser_games.isSignedIn
                     }
                 }
                 iosIsSignedIn.postMessage('')
@@ -171,7 +173,7 @@ export function getStorage(): Storage | null {
             const iOSArg = JSON.stringify(value === undefined ? {key, callbackID} : {key, serializedValue, callbackID})
             const result = callNativeMethod(methodName, androidArgs, iOSArg)
             if (result.usedImplementation === 'Android') {
-                delete (window.sbrowser as {[id: string]: unknown})[callbackID]
+                delete (window.sbrowser_games as {[id: string]: unknown})[callbackID]
                 if (result.thrownError) {
                     reject(result.thrownError)
                 } else {
@@ -196,24 +198,24 @@ export function getStorage(): Storage | null {
             }
         })
         const callback = (
-            window.sbrowser as {[id: string]: (error: Error | undefined, value: unknown) => void}
+            window.sbrowser_games as {[id: string]: (error: Error | undefined, value: unknown) => void}
         )[callbackID]
         return {callbackID, callback}
     }
 
     function createGlobalCallback(callback: (error: Error | undefined, value: unknown) => void): string {
-        window.sbrowser = window.sbrowser || {}
+        window.sbrowser_games = window.sbrowser_games || {}
         const callbackIdPrefix = `${Date.now()}` + Math.floor(Math.random() * 8_192)
         let idCounter = 0
-        while (`callback_${callbackIdPrefix}_${idCounter}` in window.sbrowser) {
+        while (`callback_${callbackIdPrefix}_${idCounter}` in window.sbrowser_games) {
             idCounter++
         }
         const callbackId = `callback_${callbackIdPrefix}_${idCounter}`
-        ;(window.sbrowser as {[id: string]: (error: Error | undefined, value: unknown) => void})[callbackId] = (
+        ;(window.sbrowser_games as {[id: string]: (error: Error | undefined, value: unknown) => void})[callbackId] = (
             error: Error | undefined,
             value: unknown,
         ): void => {
-            delete (window.sbrowser as {[id: string]: unknown})[callbackId]
+            delete (window.sbrowser_games as {[id: string]: unknown})[callbackId]
             callback(error, value)
         }
         return callbackId
