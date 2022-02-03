@@ -170,7 +170,9 @@ export function getStorage(): Storage | null {
             const {callbackID} = createCallback(resolve, reject)
             const serializedValue = value === undefined ? value : JSON.stringify(value)
             const androidArgs = value === undefined ? [key] : [key, serializedValue]
-            const iOSArg = JSON.stringify(value === undefined ? {key, callbackID} : {key, serializedValue, callbackID})
+            const iOSArg = JSON.stringify(
+                value === undefined ? {key, callbackID} : {key, value: serializedValue, callbackID},
+            )
             const result = callNativeMethod(methodName, androidArgs, iOSArg)
             if (result.usedImplementation === 'Android') {
                 delete (window.sbrowser_games as {[id: string]: unknown})[callbackID]
