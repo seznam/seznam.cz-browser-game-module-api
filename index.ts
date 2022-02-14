@@ -19,6 +19,7 @@ interface ApiBinding<MethodBinding extends AndroidApiMethodBinding | IOSApiMetho
     terminate?: MethodBinding | unknown
     gamesPlay?: MethodBinding | unknown
     gamesExit?: MethodBinding | unknown
+    submitUsageStatistics?: MethodBinding | unknown
     openLoginForm?: MethodBinding | unknown
     isSignedIn?: MethodBinding | unknown
     storage_get?: MethodBinding | unknown
@@ -81,8 +82,12 @@ export function gamesPlay(gameId: string): void {
     callNativeVoidReturningMethod('gamesPlay', [gameId])
 }
 
-export function gamesExit(gameId: string, gamesPlayed: number, gamesWon: number): boolean {
-    return callNativeVoidReturningMethod('gamesExit', [gameId, gamesPlayed, gamesWon], JSON.stringify({
+export function gamesExit(): boolean {
+    return callNativeVoidReturningMethod('gamesExit')
+}
+
+export function submitUsageStatistics(gameId: string, gamesPlayed: number, gamesWon: number): boolean {
+    return callNativeVoidReturningMethod('submitUsageStatistics', [gameId, gamesPlayed, gamesWon], JSON.stringify({
         game: gameId,
         'games-played': gamesPlayed,
         'games-won': gamesWon,
